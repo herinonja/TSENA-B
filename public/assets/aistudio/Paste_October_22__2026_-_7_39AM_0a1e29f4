@@ -1,0 +1,172 @@
+ RÔLE
+Tu es un développeur mobile senior et un designer UX. Construis une application mobile de vente et de location en ligne basée UNIQUEMENT sur l'« offre sous pli cacheté » : minimaliste, moderne, très simple à utiliser, pour le marché malgache (monnaie : Ariary, langues : français + malgache via fichiers i18n).
+STACK
+React Native (Expo) + TypeScript, Supabase (auth, Postgres, storage, realtime, Edge Functions), react-native-maps, notifications push. Code modulaire, commenté, avec gestion d'erreurs et états de chargement. RÈGLE CRITIQUE : toute la logique sensible (offres, attribution, stock, cautions, clôture, séquestre, paiements) s'exécute côté serveur (fonctions Postgres / Edge Functions), jamais côté client. Écris des tests unitaires pour le moteur d'offres, l'attribution du stock et la couche paiement.
+DESIGN
+- Minimaliste : beaucoup d'espace blanc, une couleur d'accent, typographie lisible, coins arrondis, icônes simples.
+- Mode clair/sombre, barre d'onglets en bas, actions principales à portée du pouce.
+- Formulaires en étapes (stepper) avec barre de progression, un sujet par écran, erreurs claires.
+- Léger et adapté aux connexions lentes : images compressées, chargement progressif, brouillons hors ligne, SMS en secours pour les notifications critiques.
+CONCEPT : L'OFFRE SOUS PLI CACHETÉ
+La plateforme est le tiers de confiance. Seul le vendeur voit les offres pendant la période de vente. Il ne peut ni les créer, ni les modifier, ni en mentir le nombre. Aucune enchère ouverte, aucun prix fixe : uniquement des offres cachées et du marchandage encadré.
+COMPTES ET RÔLES
+- Un compte = un ID unique lisible (ex. MG-XXXXXX) + un QR de profil + plusieurs badges possibles : acheteur, vendeur, loueur, livreur.
+- Acheteur activé après vérification du téléphone. Vendeur et loueur après KYC complet. Livreur après KYC (documents de déplacement seulement si la réglementation locale l'exige pour le moyen déclaré).
+- Réputation séparée par rôle. Sélecteur de mode « Acheteur / Vendeur / Livreur » qui adapte les onglets.
+- Anti-conflit : impossible de livrer une commande dont on est acheteur ou vendeur, impossible d'offrir sur sa propre annonce.
+INSCRIPTION ET KYC
+Étapes guidées : téléphone (OTP) → infos personnelles → CIN recto/verso (cadrage guidé, OCR, contrôle de lisibilité) → certificat de résidence → selfie avec détection de vivacité → récapitulatif. Statuts : en attente / vérifié / refusé (avec motif). Badges de niveau de confiance. Une CIN = un seul compte (détection des doublons, liaison téléphone/appareil).
+PUBLICATION GUIDÉE
+Assistant en étapes : catégorie → photos guidées par gabarit (angles et nombre minimum par catégorie) → caractéristiques propres à la catégorie → état → mode (vente simple d'1
+
+ unité / vente à stock de N unités identiques / location) → prix neuf d'origine + ancienneté (aide au prix) → prix souhaité (public) → prix plancher (caché, optionnel mais recommandé, jamais supérieur au prix souhaité) → [si stock] quantité en stock, TARIF DE GROS optionnel (seuil G, prix souhaité de gros, plancher de gros, plafond de quantité par offre de gros, quota prioritaire gros R) → durée du compte à rebours (48 h / 72 h / 7 jours) → option « accepter automatiquement dès qu'une offre atteint le prix souhaité » (annonces simples) → livraison (locale et/ou province) avec poids, taille (S/M/L/XL) et valeur déclarée → aperçu → publication.
+- Toutes les annonces utilisent le même modèle de fiche généré par l'app. Score de qualité ; publication bloquée sous le minimum requis.
+- Validité maximale d'une annonce : 30 jours. Sans offre, elle expire.
+- Après la première offre : annonce verrouillée (règles de verrouillage dans STOCK). Le vendeur peut baisser les prix souhaités (les acheteurs ayant déjà offert sont prévenus), jamais les relever ni relever les planchers.
+- Justification obligatoire si le prix souhaité dépasse nettement la fourchette connue de la catégorie.
+INFORMATIONS VISIBLES PAR LES ACHETEURS
+Photos, titre, catégorie, état, caractéristiques, mode, prix souhaité (détail ET gros avec le seuil G), date de fin ou statut « En attente d'une première offre » / « Compte à rebours lancé », mention « peut être clôturée à tout moment », nombre d'offres (compteur calculé par la plateforme), « En stock » ou « Dernières unités », mention « Priorité aux commandes de gros » si un quota gros existe, quantité maximale par offre, zone approximative, options de livraison avec frais et délais estimés (y compris envoi en province), pour une location : disponibilités et caution, profil du vendeur (ID, badges, vérification, note, ventes, ancienneté, taux de « meilleure offre acceptée », « vend en moyenne à X % de son prix souhaité »). JAMAIS VISIBLES : montants des offres, identité des autres acheteurs, planchers, nombre exact de stock (sauf option du vendeur), adresse exacte, contacts (avant conclusion).
+MOTEUR D'OFFRES
+- Offre minimale AUTOMATIQUE : 50 % du prix souhaité du palier concerné (paramétrable par catégorie côté administration). Une offre peut être inférieure au prix souhaité (marchandage) ou supérieure (surenchère). Une offre inférieure au minimum est refusée à la saisie.
+- Chaque offre est ENGAGEANTE : caution de 10 % du total, bloquée dans le portefeuille (solde disponible requis), rendue aux perdants dès la clôture.
+- Chaque acheteur a UNE offre initiale + UNE SEULE hausse, qui ne porte que sur le prix unitaire (la quantité est fixée à la première offre). Aucune baisse, aucun retrait.
+- Une offre contient : prix unitaire, quantité souhaitée, quantité minimale acceptée (annonce simple : 1 et 1).
+- ÉCRAN DE CONFIRMATION avant chaque envoi : prix unitaire et total en très gros ET écrits en lettres, quantité visible, récapitulatif (produit, caution de 10 %, « offre définitive, sans retrait »), validation par glissement ou appui prolongé, bouton « Modifier ». Pas de fenêtre d'annulation après envoi.
+- Retour à l'acheteur sans montant : « offre solide » ou « à renforcer » (comparée aux offres du même type), jamais de rang exact ni de montant pendant la vente.
+- Registre scellé : chaque offre reçoit un code unique, un horodatage précis, un chaînage par hash et un accusé de réception (QR). Il sert de preuve en cas de litige.
+
+ - Anonymat avant clôture : le vendeur voit un score de confiance, pas le nom ni les contacts. La messagerie ne s'ouvre qu'après conclusion.
+COMPTE À REBOURS ET CLÔTURE
+- Le compte à rebours démarre à la PREMIÈRE offre valide. Notification push aux utilisateurs qui suivent l'annonce : « Une offre a été reçue, il reste X h ».
+- Contre-offre privée : le vendeur peut envoyer à un acheteur une contre-offre strictement supérieure à son offre (prix unitaire), valable 24 h. L'acheteur peut seulement accepter (vente conclue) ou refuser.
+- Clôture anticipée : par défaut, le vendeur accepte la plus haute offre du moment. Il peut en accepter une autre : les acheteurs mieux placés sont informés et son taux de « meilleure offre acceptée » baisse.
+- À l'échéance (annonce simple) : la plus haute offre ≥ plancher l'emporte AUTOMATIQUEMENT, le vendeur ne peut pas refuser. Si aucune offre n'atteint le plancher : pas de vente automatique, contre-offre possible dans les 24 h, sinon expiration et cautions rendues. Pour les annonces à stock : voir STOCK.
+- Le gagnant paie le solde depuis son portefeuille sous 24 h. Sans paiement, sa caution est perdue (partagée vendeur/plateforme) et le vendeur peut se tourner vers la deuxième meilleure offre.
+- Résultat officiel : chaque participant reçoit son rang et le prix final. Un vendeur qui annule après conclusion subit une pénalité de réputation.
+STOCK ET ANNONCES À STOCK
+- Une annonce à stock propose N unités IDENTIQUES (même article, état, photos). Articles d'occasion non identiques : une annonce par unité. Taille de lot maximale configurable (ex. 10 au lancement ; au-delà, abonnement Boutique Pro).
+- États du stock : disponible, réservé (vente conclue, paiement ou livraison en cours), vendu, à contrôler (retour validé). Vente conclue : disponible → réservé ; clôture de commande : réservé → vendu ; non-paiement sous 24 h ou annulation : réservé → disponible (deuxième meilleure offre proposée) ; retour validé : → à contrôler, puis le vendeur choisit « remettre en vente » ou « retirer ».
+- Anti-survente : attribution et décrément ATOMIQUES côté serveur (transaction avec verrou). Impossible d'accepter plus que le disponible. Tests de concurrence obligatoires.
+- Clôture partielle : quand le vendeur accepte une offre (ou qu'une contre-offre est acceptée), sa quantité est vendue, le stock diminue et l'annonce RESTE ouverte tant qu'il reste du stock ; les autres offres restent valables jusqu'à la fin de la période.
+- À l'échéance de la période, attribution selon l'algorithme ci-dessous. Les offres non servies expirent (cautions rendues) ; bouton « Reconduire mon offre » : offre pré-remplie, nouvelle confirmation, nouvelle caution.
+- S'il reste des unités : nouvelle période automatique (le compte à rebours repart à la prochaine première offre valide) jusqu'à épuisement ou fin de la validité maximale (renouvelable). Stock à 0 : « Épuisé », offres restantes annulées, cautions rendues.
+- Modifications autorisées malgré le verrouillage : augmenter le stock, le diminuer jusqu'aux unités disponibles non réservées, ajouter des photos, baisser les prix. Pour relever un prix, modifier G ou les quotas : « Nouvelle série » (clone avec le stock restant), possible seulement sans offre active.
+- Alertes : stock faible, rupture, expiration proche ; bouton « Réapprovisionner ».
+
+ - Quantité maximale effective d'une offre = min(plafond applicable, stock disponible, limite de livraison selon poids/volume, notamment pour l'envoi en province).
+TARIFS DÉTAIL / GROS (annonces à stock)
+- Deux paliers : DÉTAIL (de 1 à G−1 unités) et GROS (à partir de G unités, G ≥ 2). Chaque palier a un prix souhaité unitaire (public), un plancher unitaire (caché) et une offre minimale automatique (50 % du souhaité du palier). Validations à la publication : plancher ≤ souhaité dans chaque palier ; souhaité gros ≤ souhaité détail ; plancher gros ≤ plancher détail ; messages d'erreur explicatifs.
+- Le TYPE d'une offre est déterminé par sa QUANTITÉ MINIMALE ACCEPTÉE : minimum ≥ G → offre de gros (elle garantit le volume) ; sinon offre de détail. Offre de détail : quantité souhaitée ≤ G−1 (plafond fixe). Offre de gros : quantité souhaitée ≤ plafond gros (défini par le vendeur). Quand l'acheteur monte la quantité jusqu'à G, l'app affiche « Tarif de gros disponible : il faut accepter au minimum G unités ».
+- Le plancher applicable est celui du type de l'offre, pour TOUTES ses unités. Une offre de gros servie partiellement reste une offre de gros (son minimum est ≥ G).
+- Quota prioritaire gros R (optionnel, défaut 0) : R vaut 0, ou est compris entre G et le stock disponible (sinon la publication est refusée avec un message clair). R s'applique à chaque période, plafonné au stock disponible. R restant = R moins les unités de gros déjà vendues pendant la période.
+- Si le stock disponible tombe sous G, le palier de gros est SUSPENDU : les offres de gros ne peuvent plus être servies, les acheteurs concernés sont notifiés.
+- ATTRIBUTION À L'ÉCHÉANCE (algorithme déterministe, testé) :
+1. Écarter les offres inférieures au plancher de leur type (elles restent visibles du vendeur : acceptation manuelle ou contre-offre possibles).
+2. Si R > 0, passe gros : classer les offres de gros par prix unitaire décroissant (égalité : montant final enregistré en premier) et les servir jusqu'à R unités au total.
+3. Passe générale : classer toutes les offres restantes (détail + gros non servies) par prix unitaire décroissant (même départage) et les servir sur le stock restant.
+4. Pour chaque offre examinée : si le stock disponible pour la passe couvre la quantité souhaitée, la servir en entier ; sinon si elle couvre au moins la quantité minimale acceptée, la servir avec le reste ; sinon passer à la suivante.
+5. Chaque gagnant paie SA PROPRE offre (prix unitaire × quantité servie). Cautions ajustées, perdants remboursés.
+- Le moteur renvoie pour CHAQUE offre un motif : SERVIE_ENTIERE, SERVIE_PARTIELLE, SOUS_PLANCHER, MINIMUM_NON_COUVERT, STOCK_EPUISE, STOCK_SOUS_SEUIL, QUOTA_GROS_RESERVE (acceptation manuelle refusée). Ces motifs alimentent les notifications et l'écran « Pourquoi cette attribution ? ».
+- Acceptation manuelle (clôture partielle) : le vendeur peut accepter n'importe quelle offre, partiellement si la quantité respecte le minimum de l'acheteur. Une acceptation de type détail est refusée si elle entamerait le quota gros restant, sauf si le vendeur réduit R.
+- Transparence : le palier de gros, le seuil G et la mention « Priorité aux commandes de gros » sont affichés aux acheteurs. Planchers et quotas exacts restent cachés.
+- Litige partiel : vérification et remboursement par unité (compter les unités dans la checklist). Plafonds de montant total par niveau KYC.
+COMPRÉHENSION VENDEUR (UX du tarif détail/gros)
+
+ - Mode simple par défaut. Trois préréglages à l'étape stock : « Prix unique par unité », « Détail + gros », « Gros prioritaire ». Options avancées repliées.
+- Libellés en langage courant (FR/MG) : « Prix pour 1 à 5 unités », « Prix de gros à partir de 6 unités », « Garder 6 unités pour les gros acheteurs ». Aide contextuelle (icône ?) à chaque réglage, avec la différence expliquée simplement : « Prix plancher : en dessous, la vente ne se fait pas automatiquement à l'échéance (vous pouvez quand même accepter ou contre-proposer). »
+- Barre visuelle du stock (unités réservées au gros / reste), mise à jour en direct, avec une phrase dynamique : « Si des acheteurs de gros offrent, les 6 premières unités leur seront attribuées. Sinon, elles seront proposées à tous. »
+- Simulateur « Que se passerait-il ? » avant publication : 3 scénarios types générés à partir des réglages (forte demande au détail, une grosse commande, mélange), avec qui reçoit quoi, revenu total et stock restant. Comparaison automatique avec et sans quota. Il utilise EXACTEMENT le même code d'attribution que le moteur.
+- Rapport après chaque période « Pourquoi cette attribution ? » : résultat par offre (sans noms avant conclusion) avec le motif en langage clair. Les acheteurs reçoivent aussi leur motif.
+- Mini-tutoriel de 3 écrans à la première création d'une annonce à stock. Suggestions génériques de seuil G (douzaine, carton, lot), ajustables.
+- Tous les textes en français et en malgache, à tester avec 3 à 5 vendeurs avant le lancement.
+AIDE AU PRIX (ÉVOLUTIVE)
+- Au lancement, pas de grille manuelle ni de jauge : champs prix neuf + ancienneté + état, décote générique ajustable, conseils simples. La suggestion de remise de gros est générique et ajustable.
+- Collecte automatique dès le premier jour du rapport offres / prix souhaité par catégorie et par type (détail/gros).
+- Une catégorie n'active la jauge de réalisme, les annonces comparables et l'indicateur côté acheteur qu'après un seuil de ventes conclues (ex. 10). Avant, ne rien afficher plutôt qu'une fausse référence.
+- Option : estimation par IA marquée « indicative ». Incitations : badge « Prix réaliste », badge « Vendeur au juste prix », alerte « aucune offre depuis 48 h, baisser de 10 % ? ». Lancer avec 2 ou 3 catégories.
+LOCATION
+Prix souhaité par jour, semaine ou mois. Offres sur dates précises, périodes compatibles acceptables ensemble, fin du compte à rebours avant le début demandé. Caution de location, état des lieux photo avant/après validé par QR, restitution par scan. Au départ : location en livraison locale uniquement, annonces simples (pas de stock).
+PORTEFEUILLE
+- Portefeuille en Ariary avec deux soldes : DISPONIBLE et BLOQUÉ (cautions, séquestres, provisions de retour, débours).
+- Recharge et retrait uniquement via mobile money. Frais opérateur uniquement à la recharge et au retrait. Tous les mouvements internes (cautions, paiements, commissions, gains livreurs, remboursements) sont instantanés et sans frais.
+
+ - Livre de comptes en partie double, écritures immuables et horodatées, chaque mouvement lié à une référence. Une offre exige un solde disponible suffisant, sinon « Recharger » sans quitter l'écran.
+- Sécurité : PIN ou biométrie, retrait vers un numéro mobile money enregistré (délai de sécurité après changement), plafonds selon le niveau KYC, détection d'anomalies, historique exportable.
+COUCHE PAIEMENT
+- Interface PaymentProvider : le reste de l'app ne connaît QUE cette interface. Adaptateurs : SimulatedProvider, MvolaProvider, OrangeMoneyProvider, AirtelMoneyProvider (un fournisseur futur, ex. e-Ariary, doit pouvoir s'ajouter sans toucher au reste). Choix selon l'opérateur de l'utilisateur et PAYMENT_PROVIDER en variable d'environnement.
+interface PaymentProvider {
+name: string;
+requestPayment(p: { phone: string; amount: number; reference: string }): Promise<{
+providerTxId: string; status: 'pending' | 'success' | 'failed' }>;
+sendPayout(p: { phone: string; amount: number; reference: string }): Promise<{
+providerTxId: string; status: 'pending' | 'success' | 'failed' }>;
+getStatus(providerTxId: string): Promise<'pending' | 'success' | 'failed'>; parseWebhook(req: unknown): { providerTxId: string; status: string; reference: string }; estimateFees(amount: number, direction: 'in' | 'out'): number;
+}
+- SimulatedProvider livré en premier : scénarios configurables (succès immédiat ou différé, refus, timeout, webhook en double, webhook en retard, montant incorrect), vrais webhooks signés, écran développeur masqué en production. Adaptateurs réels en squelettes (méthodes + TODO), identifiants en variables d'environnement serveur uniquement.
+- Recharge : montant → frais estimés → requestPayment → validation sur le téléphone → webhook → crédit. Retrait : montant d'abord BLOQUÉ → sendPayout → succès : débit définitif ; échec : déblocage.
+- Fiabilité : crédit UNIQUEMENT sur confirmation serveur vérifiée (signature du webhook + contre-vérification getStatus) ; idempotence par reference unique avec contrainte en base ; table provider_transactions ; relance des « pending » avec backoff et expiration ; aucune clé ni appel opérateur depuis le mobile. Minimum de retrait, plafonds par niveau KYC, retraits gratuits par mois : paramètres configurables.
+- Séparation des fonds : comptes logiques FONDS_CLIENTS, EXPLOITATION, FONDS_GARANTIE et un compte miroir par compte réel. Invariant : somme des soldes des portefeuilles (disponible + bloqué) = somme des comptes réels « fonds clients ». Les commissions ne passent vers EXPLOITATION qu'à la conclusion d'une vente.
+- Réconciliation quotidienne : import des relevés (API ou CSV), comparaison avec provider_transactions et le livre de comptes, détection des écarts (manquant, doublon, montant différent, pending ancien, invariant rompu), rapport + alertes, gel automatique des retraits importants au-delà d'un seuil, administration avec journal d'audit.
+- Sécurité : signatures de webhooks, limitation de débit, alertes sur retraits anormaux, double approbation pour tout transfert manuel entre comptes réels.
+COMMANDE, LIVRAISON LOCALE ET CLÔTURE
+- Statuts : payée → préparée → collectée → en route → remise → vérification → clôturée. Branche : litige → retour en cours → retournée → remboursée.
+
+ - À la commande, bloquer : prix, frais de livraison aller, PROVISION RETOUR (égale aux frais aller). Une commande par gagnant, avec ses quantités ; frais recalculés selon poids/volume total ; missions de collecte groupées pour un même livreur (un QR et une chaîne de preuves par colis).
+- Chaîne de preuves : photo horodatée du colis + QR à usage unique à chaque remise (vendeur→livreur, livreur→acheteur ; retour : acheteur→livreur, livreur→vendeur).
+- À la remise, le livreur scanne le QR de l'acheteur et l'invite à vérifier le colis en sa présence. Ses frais aller sont versés dès ce scan, indépendamment de la décision de l'acheteur.
+- Vérification : checklist générée depuis la fiche standardisée (état, contenu, nombre d'unités, conformité aux photos). Boutons « Conforme, clôturer » ou « Non conforme » (motif + photos). Le livreur ne peut jamais valider à la place de l'acheteur.
+- Fenêtre de vérification de 24 h (paramétrable par catégorie), rappels push/SMS, clôture tacite sans action, suspendue par un litige. Bonus livreur si clôture sans litige dans l'heure suivant la remise ET checklist complétée.
+- Clôture : séquestre libéré vers le portefeuille du vendeur (moins commission), bonus livreur, provision retour rendue, demande de notation.
+- Suivi GPS temps réel, itinéraire, ETA, lien de suivi partageable, missions par proximité (accepter/refuser).
+ENVOI EN PROVINCE PAR TAXI-BROUSSE (livraison multi-étapes)
+- Quand vendeur et acheteur sont dans des villes éloignées : 3 tronçons. A) vendeur → gare routière de départ (livreur d'expédition) ; B) transport inter-villes par une coopérative de taxi-brousse (acteur externe, hors app) ; C) gare d'arrivée → acheteur (livreur de réception). A et C sont des missions indépendantes, payées séparément. Le vendeur peut déposer lui-même le colis, l'acheteur peut le récupérer lui-même, avec les mêmes preuves.
+- Annuaire des gares routières et coopératives : nom, ville, destinations, horaires et tarifs indicatifs, note des livreurs, statut « vérifié », alimenté par les livreurs et validé par l'administration.
+- Tronçon A : le vendeur « confie la mission » à un livreur (diffusion aux livreurs proches ou invitation d'un favori) et choisit la coopérative. Collecte par QR + photos ; colis scellé (photo avant/après, n° de scellé) avec un CODE COLIS (étiquette QR imprimable ou code court écrit au marqueur). À la remise du colis, la coopérative montre une petite carte (infos du chauffeur et du véhicule) : le livreur la PHOTOGRAPHIE ; l'app tente d'en extraire par OCR (optionnel) le nom du chauffeur, son téléphone et l'immatriculation, avec correction manuelle. Le livreur SAISIT MANUELLEMENT l'heure prévue de départ et l'heure prévue d'arrivée. Il envoie aussi : reçu/bordereau (photo + n°), photo du colis déposé, nom de la coopérative, position GPS à la gare. Débours (frais de coopérative) crédités à l'acceptation, justifiés par la photo du reçu (trop-perçu restitué).
+- Tronçon B : pas de GPS. Le statut passe à « en transit » à l'heure de départ prévue saisie (sauf retard signalé) ; alerte si l'arrivée n'est pas confirmée à l'heure prévue + tolérance. Le téléphone du chauffeur n'est visible que par le livreur de réception et le support ; l'acheteur voit coopérative, immatriculation et heures prévues. « Arrivé en gare » est confirmé par le livreur de réception ou l'acheteur à la récupération. Les écarts prévu/réel alimentent la note de ponctualité des coopératives.
+- Tronçon C : dès « en transit », l'acheteur voit « Appeler un livreur à l'arrivée » (livreurs proches de la gare d'arrivée) ou « Je récupère moi-même ». Un code de retrait à usage unique, le n° de bordereau et le nom du destinataire sont remis au livreur de réception pour
+
+ la coopérative. Il photographie le colis à la récupération (scellé intact ?) puis le remet à l'acheteur par QR ; vérification et clôture comme en livraison locale.
+- Rémunération : A payé à la validation de la preuve de dépôt (contrôles : photo, n° de bordereau, proximité GPS de la gare) ; C payé à la remise à l'acheteur ; débours remboursés sur justificatif. À la commande, bloquer le coût total estimé : A + coopérative + C + provision retour (égale à l'aller total).
+- Statuts : payée → préparée → collectée (A) → déposée → en transit → arrivée en gare → récupérée (C) → remise → vérification (48 h) → clôturée.
+- Garde-fous : catégories, poids et valeur éligibles configurables (fragile ou grande valeur exclus ou assurance optionnelle), valeur déclarée, perte ou avarie en transit indemnisée par le FONDS_GARANTIE dans un plafond ; délai de retrait en gare maximal de 72 h (au-delà : frais de garde à la charge de l'acheteur, puis retour ou litige) ; vendeur et acheteur vérifiés. Retour : même chaîne en sens inverse, uniquement pour un litige validé.
+RETOUR ET REMBOURSEMENT
+Déclencheurs : refus à la remise, litige pendant la fenêtre de vérification, livraison échouée. 1. Refus ou litige : motif + photos. Si le livreur est présent, il reprend le colis ; sinon une mission de retour est créée.
+2. Le livreur est TOUJOURS payé pour chaque trajet effectué (aller, retour, déplacement à vide), quel que soit le résultat. Paiement avancé depuis les fonds bloqués (séquestre et provision retour), répartition définitive selon la responsabilité.
+3. Retour : le vendeur scanne le QR à la réception et compare avec les photos de départ. Si tout est conforme, remboursement immédiat sur le portefeuille de l'acheteur ; sinon litige. Les unités retournées passent en stock « à contrôler ».
+4. Répartition des frais :
+- Produit non conforme à l'annonce : le vendeur paie aller + retour, l'acheteur est remboursé intégralement.
+- Refus injustifié (produit conforme) : l'acheteur paie aller + retour via sa provision, sa caution de 10 % est conservée (partagée vendeur/plateforme), pénalité de réputation.
+- Colis abîmé ou perdu pendant le transport (prouvé par la chaîne de photos) : couvert par le FONDS_GARANTIE (alimenté par une petite part des frais de livraison), note du livreur impactée si sa responsabilité est établie.
+- Acheteur injoignable : livreur payé aller + retour par l'acheteur ; annulation après 2 tentatives.
+- Vendeur absent au retrait : déplacement à vide payé par le vendeur.
+5. Arbitrage : règles automatiques sur preuves (fiche standardisée, photos horodatées, chaîne de remise), puis revue humaine (objectif 48 h), décision motivée, impact sur la réputation.
+NOTATION DES LIVRAISONS
+- Après chaque mission, l'acheteur et le vendeur notent le livreur (1 à 5 étoiles + tags : ponctualité, soin du colis, courtoisie, communication). Note SÉPARÉE de l'avis sur le produit. Le livreur note aussi l'acheteur et le vendeur ; les livreurs notent les coopératives de l'annuaire.
+- Score agrégé visible sur le profil. Un bon score donne accès aux missions prioritaires, aux bonus et au badge « Livreur de confiance ». Sous un seuil : avertissement puis suspension.
+LIVREURS : LIBERTÉ DES MOYENS
+
+ Aucun moyen imposé (à pied, vélo, deux-roues, tuk-tuk, voiture, camionnette, transport en commun...). Le livreur déclare ses moyens et choisit celui de chaque mission. L'app adapte itinéraire et ETA (approximative pour les transports collectifs). Tarif basé sur la distance et la taille/poids du colis, jamais sur le type de véhicule. Les missions proposées correspondent à la capacité déclarée.
+COMMUNICATION
+Messagerie in-app liée à chaque commande (texte + photos), numéros masqués, signalement d'utilisateur, historique conservé comme preuve. En livraison multi-étapes, un fil commun relie vendeur, acheteur et livreur concerné à chaque tronçon.
+TABLEAU DE BORD VENDEUR
+Ventes jour/semaine/mois, revenus, commissions déduites, annonces en attente d'offre, comptes à rebours en cours, nombre d'offres, taux de conversion, produits les plus vus, commandes à traiter (dont envois en province), stock par annonce et par état, unités vendues, prix moyen obtenu vs prix souhaité par type (détail/gros), rotation, ruptures, quota gros consommé, taux de meilleure offre acceptée, graphiques simples, export CSV.
+MONÉTISATION (à prévoir dans le modèle de données)
+Commission uniquement sur ventes conclues, partage des cautions perdues, annonces mises en avant (visibilité uniquement, JAMAIS de priorité sur les offres), abonnement « Boutique Pro » (lots plus grands, statistiques avancées, commission réduite), vérification express, certificat de vente, commission livreur (avec bonus), frais de retrait mobile money, assurance optionnelle pour les envois en province, fonds de garantie.
+SÉCURITÉ
+Row Level Security, chiffrement des documents d'identité, accès KYC restreint, journal d'audit, limites de tentatives, détection de comptes multiples, rate limiting sur les offres et les paiements.
+JEU DE TESTS D'ATTRIBUTION (tests automatiques obligatoires)
+Configuration commune : stock 10, G=6, plafond détail 5, plafond gros 10. DÉTAIL : souhaité 10 000, plancher 8 000, offre minimale 5 000. GROS : souhaité 8 500, plancher 6 500, offre minimale 4 250. Format : quantité souhaitée / minimum accepté @ prix unitaire.
+- T1 Quota R=6. Offres : W1 6/6 @7 000 ; D1 3/3 @9 500 ; D2 4/1 @9 000 ; D3 2/2 @8 200. Résultat : W1 = 6 unités (42 000), D1 = 3 (28 500), D2 = 1 (9 000), D3 = 0 (STOCK_EPUISE). Total 79 500, stock restant 0.
+- T2 Mêmes offres, R=0. Résultat : D1 = 3, D2 = 4, D3 = 2, W1 = 0 (MINIMUM_NON_COUVERT, 1 unité restante). Total 80 900, stock restant 1, nouvelle période.
+- T3 Gros partiel, R=0. D1 4/4 @9 500 ; W1 8/6 @7 500. Résultat : D1 = 4 (38 000), W1 = 6 (45 000). Total 83 000.
+- T4 Égalité de prix, stock 4. D1 3/1 @9 000 (montant final enregistré à 10:00) ; D2 3/3 @9 000 (09:00). Résultat : D2 = 3, D1 = 1.
+- T5 Planchers. W 6/6 @6 000 (< 6 500) et D 2/2 @7 500 (< 8 000) : exclues de l'attribution automatique (SOUS_PLANCHER), visibles du vendeur (acceptation manuelle ou contre-offre possibles). Offre 6/6 @4 000 (< 4 250) : refusée à la saisie.
+
+ - T6 Quota et acceptation manuelle, R=6, aucune vente de gros. Accepter D1 pour 5 unités : refusé (QUOTA_GROS_RESERVE, message explicite). Pour 4 unités : accepté. Après réduction de R à 0 : accepté.
+- T7 Concurrence. Deux acceptations simultanées de 2 unités alors que 3 restent : une réussit, l'autre est refusée (stock insuffisant). Stock jamais négatif.
+- T8 Validations de publication : R=4 avec G=6 refusé ; souhaité gros > souhaité détail refusé ; plancher gros > plancher détail refusé ; G=1 refusé.
+- T9 Stock sous G : stock 5, G=6 → palier gros suspendu, offres de gros non servies (STOCK_SOUS_SEUIL), acheteurs notifiés.
+- T10 Acceptation partielle manuelle : stock 7 ; le vendeur accepte W 8/6 pour 6 unités → autorisé ; stock restant 1.
+- T11 Reconduction : une offre non servie expire en fin de période, sa caution est rendue, « Reconduire mon offre » pré-remplit une nouvelle offre qui exige une nouvelle confirmation et une nouvelle caution.
+LIVRABLE
+Procède par phases : 1) architecture + schéma de base de données (y compris stock, paliers détail/gros, quotas) + design system ; 2) inscription, KYC, profils et badges ; 3) publication guidée + fiche standardisée + modèle de stock ; 4) moteur d'offres cachées (annonces simples et à stock, types d'offres, attribution détail/gros, confirmation, hausse, contre-offre, compte à rebours, clôture, registre) avec le jeu de tests complet et le simulateur vendeur ; 5) livre de comptes + PaymentProvider (simulé) + portefeuille + cautions + séquestre + réconciliation ; 6) commandes, QR, livraison locale, suivi GPS, clôture et retours ; 7) envoi en province par taxi-brousse ; 8) messagerie ; 9) tableau de bord vendeur, réputation, notation des livraisons et aide au prix ; 10) location ; 11) monétisation. Commence par la phase 1 et attends ma validation avant de passer à la suivante.
